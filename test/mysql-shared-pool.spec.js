@@ -88,13 +88,19 @@ describe('mysql-shared-pool tests', () => {
     
         beforeEach(async (done) => {
             options = {
-                host: mysqlOptions.host,
-                port: mysqlOptions.port,
-                user: mysqlOptions.user,
-                password: mysqlOptions.password,
-                database: mysqlOptions.database,
-                minPool: mysqlOptions.minPool,
-                maxPool: mysqlOptions.maxPool
+                connection: {
+                    host: mysqlOptions.host,
+                    port: mysqlOptions.port,
+                    user: mysqlOptions.user,
+                    password: mysqlOptions.password,
+                    database: mysqlOptions.database,
+                    multipleStatements: true
+                },
+                pool: {
+                    min: mysqlOptions.minPool,
+                    max: mysqlOptions.maxPool,
+                    idleTimeoutMillis: 1000
+                }
             };
     
             sharedPool = mysqlSharedPool.createPool(options);
@@ -125,56 +131,63 @@ describe('mysql-shared-pool tests', () => {
                     
                 } catch (error) {
                     console.error(error);
+                    expect(error).toBeUndefined();
                 }
             });
         })
     
-        afterEach(async (done) => {
-            done();
+        afterEach(async () => {
+            await sharedPool.destroy();
         })
     });
    
     // make sure for this test that no other clients are connected to the mysql server
     describe('pooling', () => {
         it('should only create the expected number of connections given multiple instances of mysqlsharedpool', async () => {
-            const options = {
-                connection: {
-                    host: mysqlOptions.host,
-                    port: mysqlOptions.port,
-                    user: mysqlOptions.user,
-                    password: mysqlOptions.password,
-                    database: mysqlOptions.database
-                },
-                pool: {
-                    min: mysqlOptions.minPool,
-                    max: mysqlOptions.maxPool,
-                    idleTimeoutMillis: 1000 // set to a few seconds so we dont have to wait a lot for the test
-                }
-            };
+            try {
+                const options = {
+                    connection: {
+                        host: mysqlOptions.host,
+                        port: mysqlOptions.port,
+                        user: mysqlOptions.user,
+                        password: mysqlOptions.password,
+                        database: mysqlOptions.database
+                    },
+                    pool: {
+                        min: mysqlOptions.minPool,
+                        max: mysqlOptions.maxPool,
+                        idleTimeoutMillis: 1000 // set to a few seconds so we dont have to wait a lot for the test
+                    }
+                };
+        
+                const pool1 = mysqlSharedPool.createPool(options);
+                const pool2 = mysqlSharedPool.createPool(options);
     
-            const pool1 = mysqlSharedPool.createPool(options);
-            const pool2 = mysqlSharedPool.createPool(options);
-
-            // do some queries
-
-            const queries = [];
-            for (let index = 0; index < mysqlOptions.maxPool * 4; index++) {
-                queries.push(pool1.raw('select * from information_schema.processlist;'));
-                queries.push(pool2.raw('select * from information_schema.processlist;'));
+                // do some queries
+    
+                const queries = [];
+                for (let index = 0; index < mysqlOptions.maxPool * 4; index++) {
+                    queries.push(pool1.raw('select * from information_schema.processlist;'));
+                    queries.push(pool2.raw('select * from information_schema.processlist;'));
+                }
+    
+                await Promise.all(queries);
+    
+                let connectionsResult = await pool1.raw('select * from information_schema.processlist;');
+    
+                expect(connectionsResult.length).toEqual(mysqlOptions.maxPool + 1);
+    
+                // connections idle for idleTimeoutMillisPool ms are removed by the pool. and only maintains connections equal to the min pool
+                await sleepAsync(9000);
+    
+                connectionsResult = await pool1.raw('select * from information_schema.processlist;');
+    
+                expect(connectionsResult.length).toEqual(mysqlOptions.minPool + 1);
+            } catch (error) {
+                console.error(error);
+                expect(error).toBeUndefined();
             }
-
-            await Promise.all(queries);
-
-            let connectionsResult = await pool1.raw('select * from information_schema.processlist;');
-
-            expect(connectionsResult.length).toEqual(mysqlOptions.maxPool + 1);
-
-            // connections idle for idleTimeoutMillisPool ms are removed by the pool. and only maintains connections equal to the min pool
-            await sleepAsync(9000);
-
-            connectionsResult = await pool1.raw('select * from information_schema.processlist;');
-
-            expect(connectionsResult.length).toEqual(mysqlOptions.minPool + 1);
+            
         }, 10000);
     })
     afterAll(async () => {
