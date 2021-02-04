@@ -107,29 +107,93 @@ describe('mysql-shared-pool tests', () => {
 
         describe('raw', () => {
             it('should be able to do raw sql queries', async () => {
+                await sharedPool.raw(`
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    INSERT INTO users (name)
+                    VALUES ('Ryan');
+
+                    INSERT INTO users (name)
+                    VALUES ('Skyler');
+                `);
+
+                const queryResult = await sharedPool.raw('SELECT * FROM users;');
+
+                expect(queryResult[0].name).toEqual('Ryan');
+                expect(queryResult[1].name).toEqual('Skyler');
+            });
+        })
+
+        describe('destroy', () => {
+            it('should destroy the pool if no one is using it already', async () => {
                 try {
-                    await sharedPool.raw(`
-                        CREATE TABLE IF NOT EXISTS users (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            name VARCHAR(255) NOT NULL,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
+                    const options = {
+                        connection: {
+                            host: mysqlOptions.host,
+                            port: mysqlOptions.port,
+                            user: mysqlOptions.user,
+                            password: mysqlOptions.password,
+                            database: mysqlOptions.database
+                        },
+                        pool: {
+                            min: 10, // so that pool will be unique
+                            max: 11,
+                            idleTimeoutMillis: 1000
+                        }
+                    };
+            
+                    const newPool = mysqlSharedPool.createPool(options);
 
-                        INSERT INTO users (name)
-                        VALUES ('Ryan');
-
-                        INSERT INTO users (name)
-                        VALUES ('Skyler');
-                    `);
-
-                    const queryResult = await sharedPool.raw('SELECT * FROM users;');
-
-                    expect(queryResult[0].name).toEqual('Ryan');
-                    expect(queryResult[1].name).toEqual('Skyler');
+                    await newPool.destroy();
                     
+                    await newPool.raw('select * from information_schema.processlist;');
+
+                    // this should not have been called
+                    expect(false).toBeTrue();
                 } catch (error) {
-                    console.error(error);
-                    expect(error).toBeUndefined();
+                    // should return an error
+                    expect(error).toBeTruthy();
+                }
+            });
+
+            it('should still be able to use it even after destroy until all users of the shared pool called destroy', async () => {
+                const options = {
+                    connection: {
+                        host: mysqlOptions.host,
+                        port: mysqlOptions.port,
+                        user: mysqlOptions.user,
+                        password: mysqlOptions.password,
+                        database: mysqlOptions.database
+                    },
+                    pool: {
+                        min: 11, // so that pool will be unique
+                        max: 12, // so that pool will be unique
+                        idleTimeoutMillis: 1000
+                    }
+                };
+        
+                const newPool1 = mysqlSharedPool.createPool(options);
+                const newPool2 = mysqlSharedPool.createPool(options);
+
+                await newPool1.destroy();
+                
+                // newPool1 should still continue
+                await newPool1.raw('select * from information_schema.processlist;');
+
+                // newPool2 should still continue
+                await newPool2.raw('select * from information_schema.processlist;');
+
+                // destroy newPool2
+                newPool2.destroy();
+
+                try {
+                    await newPool1.raw('select * from information_schema.processlist;');
+                } catch (error) {
+                    expect(error).toBeTruthy();
                 }
             });
         })
