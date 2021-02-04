@@ -77,16 +77,15 @@ const mysqlServer = (function() {
 })();
 
 describe('mysql-shared-pool tests', () => {
-    beforeAll(async (done) => {
+    beforeAll(async () => {
         await mysqlServer.up();
-        done();
     }, 60000);
 
     describe('mysql-shared-pool methods', () => {
         let sharedPool;
         let options;
     
-        beforeEach(async (done) => {
+        beforeEach(async () => {
             options = {
                 connection: {
                     host: mysqlOptions.host,
@@ -104,7 +103,6 @@ describe('mysql-shared-pool tests', () => {
             };
     
             sharedPool = mysqlSharedPool.createPool(options);
-            done();
         });
 
         describe('raw', () => {
@@ -124,7 +122,7 @@ describe('mysql-shared-pool tests', () => {
                         VALUES ('Skyler');
                     `);
 
-                    const queryResult = await sharedPool.raw('SELECT * FROM users');
+                    const queryResult = await sharedPool.raw('SELECT * FROM users;');
 
                     expect(queryResult[0].name).toEqual('Ryan');
                     expect(queryResult[1].name).toEqual('Skyler');
@@ -151,7 +149,8 @@ describe('mysql-shared-pool tests', () => {
                         port: mysqlOptions.port,
                         user: mysqlOptions.user,
                         password: mysqlOptions.password,
-                        database: mysqlOptions.database
+                        database: mysqlOptions.database,
+                        multipleStatements: false
                     },
                     pool: {
                         min: mysqlOptions.minPool,
