@@ -121,8 +121,8 @@ describe('mysql-shared-pool tests', () => {
                     VALUES ('Skyler');
                 `);
 
-                const queryResult = await sharedPool.raw('SELECT * FROM users;');
-
+                const rawResult = await sharedPool.raw('SELECT * FROM users;');
+                const queryResult = rawResult[0];
                 expect(queryResult[0].name).toEqual('Ryan');
                 expect(queryResult[1].name).toEqual('Skyler');
             });
@@ -236,14 +236,15 @@ describe('mysql-shared-pool tests', () => {
     
                 await Promise.all(queries);
     
-                let connectionsResult = await pool1.raw('select * from information_schema.processlist;');
-    
+                let rawResult = await pool1.raw('select * from information_schema.processlist;');
+                let connectionsResult = rawResult[0];
                 expect(connectionsResult.length).toEqual(mysqlOptions.maxPool + 1);
     
                 // connections idle for idleTimeoutMillisPool ms are removed by the pool. and only maintains connections equal to the min pool
                 await sleepAsync(9000);
     
-                connectionsResult = await pool1.raw('select * from information_schema.processlist;');
+                rawResult = await pool1.raw('select * from information_schema.processlist;');
+                connectionsResult = rawResult[0];
     
                 expect(connectionsResult.length).toEqual(mysqlOptions.minPool + 1);
             } catch (error) {
