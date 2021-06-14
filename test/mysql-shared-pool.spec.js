@@ -128,7 +128,7 @@ describe('mysql-shared-pool tests', () => {
             });
         })
 
-        describe('rawStream', () => {
+        describe('raw - stream', () => {
             it('should be able to do raw sql stream queries', async () => {
                 await sharedPool.raw(`
                     CREATE TABLE IF NOT EXISTS users (
@@ -144,7 +144,7 @@ describe('mysql-shared-pool tests', () => {
                     VALUES ('Skyler');
                 `);
 
-                const stream = await sharedPool.rawStream('SELECT * FROM users;');
+                const stream = await sharedPool.raw('SELECT * FROM users;').stream();
 
                 const results = [];
                 stream.on('data', (data) => {
