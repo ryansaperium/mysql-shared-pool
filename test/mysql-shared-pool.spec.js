@@ -128,6 +128,36 @@ describe('mysql-shared-pool tests', () => {
             });
         })
 
+        describe('rawStream', () => {
+            it('should be able to do raw sql stream queries', async () => {
+                await sharedPool.raw(`
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    INSERT INTO users (name)
+                    VALUES ('Ryan');
+
+                    INSERT INTO users (name)
+                    VALUES ('Skyler');
+                `);
+
+                const stream = await sharedPool.rawStream('SELECT * FROM users;');
+
+                const results = [];
+                stream.on('data', (data) => {
+                    results.push(data);
+                });
+
+                stream.on('end', () => {
+                    expect(results[0].name).toEqual('Ryan');
+                    expect(results[1].name).toEqual('Skyler');
+                });
+            });
+        })
+
         describe('destroy', () => {
             it('should destroy the pool if no one is using it already', async () => {
                 try {
