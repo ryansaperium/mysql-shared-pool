@@ -1,4 +1,4 @@
-const MySqlSharedPool = require('./lib/mysql-shared-pool');
+const mysqlSharedPool = require('./lib/mysql-shared-pool');
 
 /**
  * Create a new Connection instance.
@@ -6,6 +6,4 @@ const MySqlSharedPool = require('./lib/mysql-shared-pool');
  * @return {MySqlSharedPool} A new MySQL connection
  * @public
  */
-exports.createPool = function(config) {
-    return new MySqlSharedPool(config);
-};
+exports.createPool = mysqlSharedPool.createPool;
