@@ -1,5 +1,6 @@
 const _ = require('lodash');
-const { MySqlSharedPool } = require('./lib/mysql-shared-pool');
+const { KnexSharedPool } = require('./lib/knex-shared-pool');
+const { MySql2SharedPool } = require('./lib/mysql2-shared-pool');
 const debug = require('debug')('mysql-shared-pool');
 
 if (!global.mysqlsharedpools) {
@@ -88,7 +89,12 @@ function createPool(config) {
         // using the same structure as knex but will only set only the config that we support
         // sharedPool = global.mysqlsharedpools[poolId] = require('knex')(poolConfig);
 
-        sharedPool = global.mysqlsharedpools[poolId] = new MySqlSharedPool(poolConfig);
+        if (poolConfig.type == 'mysql2') {
+            sharedPool = global.mysqlsharedpools[poolId] = new MySql2SharedPool(poolConfig);
+        } else {
+            // default is knex
+            sharedPool = global.mysqlsharedpools[poolId] = new KnexSharedPool(poolConfig);
+        }
     } else {
         debug('found pool for id', poolId, poolConfig);
     }
