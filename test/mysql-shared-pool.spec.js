@@ -82,9 +82,6 @@ describe('mysql-shared-pool tests', () => {
     }, 60000);
 
     describe('mysql-shared-pool methods', () => {
-        /**
-         * @type {import("../lib/mysql-shared-pool").MySqlSharedPool}
-         */
         let sharedPool;
         let options;
     
@@ -147,7 +144,7 @@ describe('mysql-shared-pool tests', () => {
                     VALUES ('Skyler');
                 `);
 
-                const stream = sharedPool.rawStream('SELECT * FROM users;');
+                const stream = await sharedPool.raw('SELECT * FROM users;').stream();
 
                 const results = [];
                 stream.on('data', (data) => {
@@ -189,7 +186,7 @@ describe('mysql-shared-pool tests', () => {
                 // do some queries
     
                 const queries = [];
-                for (let index = 0; index < mysqlOptions.maxPool * 20; index++) {
+                for (let index = 0; index < mysqlOptions.maxPool * 4; index++) {
                     queries.push(pool1.raw('select * from information_schema.processlist;'));
                     queries.push(pool2.raw('select * from information_schema.processlist;'));
                 }
@@ -198,12 +195,15 @@ describe('mysql-shared-pool tests', () => {
     
                 let rawResult = await pool1.raw('select * from information_schema.processlist;');
                 let connectionsResult = rawResult[0];
-                expect(connectionsResult.length).toBeLessThanOrEqual(mysqlOptions.maxPool + 1);
+                expect(connectionsResult.length).toEqual(mysqlOptions.maxPool + 1);
+    
+                // connections idle for idleTimeoutMillisPool ms are removed by the pool. and only maintains connections equal to the min pool
+                await sleepAsync(9000);
     
                 rawResult = await pool1.raw('select * from information_schema.processlist;');
                 connectionsResult = rawResult[0];
     
-                expect(connectionsResult.length).toBeLessThanOrEqual(mysqlOptions.maxPool + 1);
+                expect(connectionsResult.length).toEqual(mysqlOptions.minPool + 1);
             } catch (error) {
                 console.error(error);
                 expect(error).toBeUndefined();
