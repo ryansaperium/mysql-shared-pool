@@ -1,6 +1,6 @@
 {
   "name": "@saperiuminc/mysql-shared-pool",
-  "version": "1.0.13",
+  "version": "1.0.12",
   "description": "Shared pooling implementation for mysql",
   "main": "index.js",
   "scripts": {
