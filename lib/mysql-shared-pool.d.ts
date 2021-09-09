@@ -1,7 +1,6 @@
 import { RowDataPacket } from "mysql2";
 import { Stream } from 'stream'
 export interface MySqlSharedPoolOptions {
-    type: "mysql"|"mysql2";
     name: string;
     connection: {
       host: string;
@@ -17,7 +16,7 @@ export interface MySqlSharedPoolOptions {
     };
   }
 
-export abstract class MySqlSharedPool {
+export class MySqlSharedPool {
     constructor(options: MySqlSharedPoolOptions)
     raw(sql: string, params: any | any[] | { [param: string]: any }): Promise<[RowDataPacket[]]>;
     rawStream(sql: string, params: any | any[] | { [param: string]: any }): Stream;

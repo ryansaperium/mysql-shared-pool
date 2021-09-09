@@ -1,3 +1,3 @@
-import { MySqlSharedPool } from "./lib/base-shared-pool";
+import { MySqlSharedPool } from "./lib/mysql-shared-pool";
 
 export function createPool(config: MySqlSharedPoolOptions): MySqlSharedPool;

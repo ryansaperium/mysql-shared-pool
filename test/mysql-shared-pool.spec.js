@@ -1,4 +1,4 @@
-const mysqlSharedPool = require('../index');
+const mysqlSharedPool = require('../index'); 
 const _ = require('lodash');
 const Bluebird = require('bluebird');
 
@@ -12,18 +12,18 @@ const mysqlOptions = {
     maxPool: 4
 };
 
-const sleepAsync = function (sleepUntil) {
+const sleepAsync = function(sleepUntil) {
     return new Promise((resolve) => {
         setTimeout(resolve, sleepUntil);
     });
 }
 
-const mysqlServer = (function () {
+const mysqlServer = (function() {
     const exec = require('child_process').exec;
     const mysql = require('mysql');
 
     return {
-        up: async function () {
+        up: async function() {
             const command = `docker run --name mysqlsharedpool_mysql -e MYSQL_ROOT_PASSWORD=${mysqlOptions.password} -e MYSQL_DATABASE=${mysqlOptions.database} -p ${mysqlOptions.port}:3306 -d mysql:5.7`;
             console.log('running docker command:', command);
             const process = exec(command);
@@ -53,7 +53,6 @@ const mysqlServer = (function () {
 
                     await conn.connectAsync();
                     console.log('connected!');
-                    conn.destroy();
                     gaveUp = false;
                     break;
                 } catch (error) {
@@ -71,7 +70,7 @@ const mysqlServer = (function () {
                 console.log('successfully connected to mysql database');
             }
         },
-        down: async function () {
+        down: async function() {
             exec('docker rm mysqlsharedpool_mysql --force');
         }
     }
@@ -82,72 +81,15 @@ describe('mysql-shared-pool tests', () => {
         await mysqlServer.up();
     }, 60000);
 
-    
-    // make sure for this test that no other clients are connected to the mysql server
-    describe('pooling', () => {
-        it('should only create the expected number of connections given multiple instances of mysqlsharedpool', async () => {
-            const doTestForType = async function (type) {
-                try {
-                    const options = {
-                        type: type,
-                        connection: {
-                            host: mysqlOptions.host,
-                            port: mysqlOptions.port,
-                            user: mysqlOptions.user,
-                            password: mysqlOptions.password,
-                            database: mysqlOptions.database,
-                            multipleStatements: false
-                        },
-                        pool: {
-                            min: mysqlOptions.minPool,
-                            max: mysqlOptions.maxPool,
-                            idleTimeoutMillis: 1000 // set to a few seconds so we dont have to wait a lot for the test
-                        }
-                    };
-
-                    const pool1 = mysqlSharedPool.createPool(options);
-                    const pool2 = mysqlSharedPool.createPool(options);
-
-                    // do some queries
-
-                    const queries = [];
-                    for (let index = 0; index < mysqlOptions.maxPool * 20; index++) {
-                        queries.push(pool1.raw('select * from information_schema.processlist;'));
-                        queries.push(pool2.raw('select * from information_schema.processlist;'));
-                    }
-
-                    await Promise.all(queries);
-
-                    let rawResult = await pool1.raw('select * from information_schema.processlist;');
-                    let connectionsResult = rawResult[0];
-                    expect(connectionsResult.length).toBeLessThanOrEqual(mysqlOptions.maxPool + 2);
-
-                    rawResult = await pool1.raw('select * from information_schema.processlist;');
-                    connectionsResult = rawResult[0];
-
-                    expect(connectionsResult.length).toBeLessThanOrEqual(mysqlOptions.maxPool + 2);
-                } catch (error) {
-                    console.error(error);
-                    expect(error).toBeUndefined();
-                }
-            }
-
-            await doTestForType('knex');
-            await doTestForType('mysql2');
-
-        }, 10000);
-    })
-    
     describe('mysql-shared-pool methods', () => {
         /**
-         * @type {import("../lib/base-shared-pool").MySqlSharedPool}
+         * @type {import("../lib/mysql-shared-pool").MySqlSharedPool}
          */
         let sharedPool;
         let options;
-
+    
         beforeEach(async () => {
             options = {
-                type: 'knex',
                 connection: {
                     host: mysqlOptions.host,
                     port: mysqlOptions.port,
@@ -162,33 +104,13 @@ describe('mysql-shared-pool tests', () => {
                     idleTimeoutMillis: 1000
                 }
             };
-
+    
             sharedPool = mysqlSharedPool.createPool(options);
         });
 
         describe('raw', () => {
             it('should be able to do raw sql queries', async () => {
-                const doTestForType = async function (type) {
-                    const options = {
-                        type: type,
-                        connection: {
-                            host: mysqlOptions.host,
-                            port: mysqlOptions.port,
-                            user: mysqlOptions.user,
-                            password: mysqlOptions.password,
-                            database: mysqlOptions.database,
-                            multipleStatements: true
-                        },
-                        pool: {
-                            min: mysqlOptions.minPool,
-                            max: mysqlOptions.maxPool,
-                            idleTimeoutMillis: 1000
-                        }
-                    };
-
-                    const sharedPool = mysqlSharedPool.createPool(options);
-
-                    await sharedPool.raw(`
+                await sharedPool.raw(`
                     CREATE TABLE IF NOT EXISTS users (
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         name VARCHAR(255) NOT NULL,
@@ -202,41 +124,16 @@ describe('mysql-shared-pool tests', () => {
                     VALUES ('Skyler');
                 `);
 
-                    const rawResult = await sharedPool.raw('SELECT * FROM users;');
-                    const queryResult = rawResult[0];
-                    expect(queryResult[0].name).toEqual('Ryan');
-                    expect(queryResult[1].name).toEqual('Skyler');
-                }
-
-                await doTestForType('knex');
-                await doTestForType('mysql2');
+                const rawResult = await sharedPool.raw('SELECT * FROM users;');
+                const queryResult = rawResult[0];
+                expect(queryResult[0].name).toEqual('Ryan');
+                expect(queryResult[1].name).toEqual('Skyler');
             });
-            
         })
 
         describe('raw - stream', () => {
             it('should be able to do raw sql stream queries', async () => {
-                const doTestForType = async function (type) {
-                    const options = {
-                        type: type,
-                        connection: {
-                            host: mysqlOptions.host,
-                            port: mysqlOptions.port,
-                            user: mysqlOptions.user,
-                            password: mysqlOptions.password,
-                            database: mysqlOptions.database,
-                            multipleStatements: true
-                        },
-                        pool: {
-                            min: mysqlOptions.minPool,
-                            max: mysqlOptions.maxPool,
-                            idleTimeoutMillis: 1000
-                        }
-                    };
-
-                    const sharedPool = mysqlSharedPool.createPool(options);
-
-                    await sharedPool.raw(`
+                await sharedPool.raw(`
                     CREATE TABLE IF NOT EXISTS users (
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         name VARCHAR(255) NOT NULL,
@@ -250,26 +147,70 @@ describe('mysql-shared-pool tests', () => {
                     VALUES ('Skyler');
                 `);
 
-                    const stream = sharedPool.rawStream('SELECT * FROM users;');
+                const stream = sharedPool.rawStream('SELECT * FROM users;');
 
-                    const results = [];
-                    stream.on('data', (data) => {
-                        results.push(data);
-                    });
+                const results = [];
+                stream.on('data', (data) => {
+                    results.push(data);
+                });
 
-                    stream.on('end', () => {
-                        expect(results[0].name).toEqual('Ryan');
-                        expect(results[1].name).toEqual('Skyler');
-                    });
-                }
-
-                await doTestForType('knex');
-                await doTestForType('mysql2');
+                stream.on('end', () => {
+                    expect(results[0].name).toEqual('Ryan');
+                    expect(results[1].name).toEqual('Skyler');
+                });
             });
         })
-
+    
     });
-
+   
+    // make sure for this test that no other clients are connected to the mysql server
+    describe('pooling', () => {
+        it('should only create the expected number of connections given multiple instances of mysqlsharedpool', async () => {
+            try {
+                const options = {
+                    connection: {
+                        host: mysqlOptions.host,
+                        port: mysqlOptions.port,
+                        user: mysqlOptions.user,
+                        password: mysqlOptions.password,
+                        database: mysqlOptions.database,
+                        multipleStatements: false
+                    },
+                    pool: {
+                        min: mysqlOptions.minPool,
+                        max: mysqlOptions.maxPool,
+                        idleTimeoutMillis: 1000 // set to a few seconds so we dont have to wait a lot for the test
+                    }
+                };
+        
+                const pool1 = mysqlSharedPool.createPool(options);
+                const pool2 = mysqlSharedPool.createPool(options);
+    
+                // do some queries
+    
+                const queries = [];
+                for (let index = 0; index < mysqlOptions.maxPool * 20; index++) {
+                    queries.push(pool1.raw('select * from information_schema.processlist;'));
+                    queries.push(pool2.raw('select * from information_schema.processlist;'));
+                }
+    
+                await Promise.all(queries);
+    
+                let rawResult = await pool1.raw('select * from information_schema.processlist;');
+                let connectionsResult = rawResult[0];
+                expect(connectionsResult.length).toBeLessThanOrEqual(mysqlOptions.maxPool + 1);
+    
+                rawResult = await pool1.raw('select * from information_schema.processlist;');
+                connectionsResult = rawResult[0];
+    
+                expect(connectionsResult.length).toBeLessThanOrEqual(mysqlOptions.maxPool + 1);
+            } catch (error) {
+                console.error(error);
+                expect(error).toBeUndefined();
+            }
+            
+        }, 10000);
+    })
     afterAll(async () => {
         // NOTE: uncomment if we need to terminate the mysql every test
         // for now, it is okay since we are using a non-standard port (13306) and a fixed docker container name
